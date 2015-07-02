@@ -1,6 +1,8 @@
 import nengo
+import numpy as np
 import pytest
 
+import nengo_spinnaker
 from nengo_spinnaker.builder import Model
 from nengo_spinnaker.builder.builder import OutputPort, InputPort
 from nengo_spinnaker.node_io import ethernet as ethernet_io
@@ -106,3 +108,20 @@ def test_get_spinnaker_sink_for_node_repeated():
 
     assert spec0.target.obj is spec1.target.obj
     assert model.extra_operators == [spec0.target.obj]
+
+
+def test_node_input():
+    """Check the node doesn't get all zeros (indicates an IP problem)"""
+    fin = lambda t: np.sin(2*np.pi*t)
+    fnode = lambda t, x: x**2
+    with nengo.Network() as model:
+        u = nengo.Node(0.5)
+        a = nengo.Ensemble(100, 1)
+        v = nengo.Node(fnode, size_in=1)
+        nengo.Connection(u, a, synapse=None)
+        nengo.Connection(a, v, synapse=None)
+        vp = nengo.Probe(v)
+
+    sim = nengo_spinnaker.Simulator(model)
+    sim.run(0.01)
+    assert not np.allclose(sim.data[vp], 0, atol=1e-1)
